@@ -1,0 +1,44 @@
+import cv2
+import pytesseract
+from google.cloud import translate_v2 as translate
+import requests
+from io import BytesIO
+from PIL import Image
+
+# Set up Google Cloud Translate API client
+translate_client = translate.Client()
+
+# Download image from URL and load it using Pillow
+response = requests.get('https://example.com/image.jpg')
+img = Image.open(BytesIO(response.content))
+
+# Convert image to OpenCV format
+img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+# Convert image to grayscale
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+# Apply thresholding to convert grayscale image to binary image
+thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+
+# Perform text detection using OpenCV's text module
+text_boxes = pytesseract.image_to_boxes(thresh).split('\n')
+
+# Loop through text boxes and overlay translated text on top of original text
+for box in text_boxes:
+    box_parts = box.split(' ')
+    x1, y1, x2, y2 = int(box_parts[1]), int(box_parts[2]), int(box_parts[3]), int(box_parts[4])
+    text = box_parts[0]
+    
+    # Translate text using Google Cloud Translate API
+    result = translate_client.translate(text, target_language="fr")
+    translated_text = result['translatedText']
+    
+    # Draw a rectangle around the text box and overlay translated text on top of it
+    cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+    cv2.putText(img, translated_text, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+# Display the final image with translated text overlaid
+cv2.imshow('Translated Image', img)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
